@@ -1,2 +1,2 @@
 # Gmail-Organizer
-Python Script to help users organize and manage gmail messages more efficiently.
+A Python script to help users organize and manage Gmail mailboxes
