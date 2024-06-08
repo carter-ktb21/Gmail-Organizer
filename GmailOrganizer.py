@@ -65,8 +65,8 @@ def get_user_profile(service):
         # Call Gmail API to get user profile
         profile = service.users().getProfile(userId="me").execute()
         print("User Profile:")
-        print(f"Email Address: {profile['emailAddress']}")
-        print(f"Messages Total: {profile['messagesTotal']}\n\n")
+        print(f"\tEmail Address: {profile['emailAddress']}")
+        print(f"\tMessages Total: {profile['messagesTotal']}\n\n")
     except HttpError as error:
         print(f"An error occurred while retrieving user profile: {error}")
 
@@ -213,17 +213,21 @@ def delete_message(message_id, service):
     print("Successfully deleted message")
     
 def show_menu(service):
-    print(f"1) Show some emails \n")
-    print(f"2) Trash emails by sender \n")
-    menu_choice = input("Enter menu choice: ")
+    while True :
+        print(f"1) Show some emails \n")
+        print(f"2) Trash emails by sender \n")
+        print(f"3) Quit\n")
+        menu_choice = input("Enter menu choice: ")
     
-    if menu_choice == "1":
-        get_number_of_emails(service)
-    elif menu_choice == "2":
-        sender_email = input(f"\nEnter sender you'd like to delete emails from: ")
-        trash_messages_by_sender(service, sender_email)
-        print(f"Done!")
-        
+        if menu_choice == "1":
+            get_number_of_emails(service)
+        elif menu_choice == "2":
+            sender_email = input(f"\nEnter sender you'd like to delete emails from: ")
+            trash_messages_by_sender(service, sender_email)
+            print(f"Done!")
+        else :
+            print(f"Thank you! Bye-bye!")
+            break
 # ------------------------------------------------------------
 
 
