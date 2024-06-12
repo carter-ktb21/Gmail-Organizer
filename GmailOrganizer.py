@@ -6,6 +6,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import re
+import time
 
 # If modifying these scopes, delete the file token.json.
 # This basically tells the code what it can do with the email data of the authorized user
@@ -93,10 +95,18 @@ def get_user_emails(service, num_emails):
                 if body:
                     print(f"Body:\n{body}")
             print("\nEnd of email-------------------------------------\n\n")
-            delete_email = input("Trash Email? (Y/N): ")
-            if delete_email == "Y":
-                delete_message(message_id, service)
-            
+            print(f"---- 1) Trash message ---- 2) Add label(s) to message ---- 3) Remove label(s) ---- 4) Next message ---- 5) Exit Search ----\n")
+            menu_choice = input(f"Enter menu choice: ")
+            if menu_choice == "1":
+                trash_message(message_id, service)
+            elif menu_choice == "2":
+                add_labels_to_message(message_id, service)
+            elif menu_choice == "3":
+                remove_labels_from_message(message_id, service)
+            elif menu_choice == "4":
+                continue
+            else:
+                break
             
     except HttpError as error:
         print(f"An error occurred while retrieving user profile: {error}")
@@ -130,6 +140,46 @@ def trash_sender_messages(messages, service, sender_email):
 
 
 
+# Search Function-----------------------------------------------------
+def search_emails(service, search_query):
+    try:
+        response = service.users().messages().list(userId="me", q=search_query).execute()
+        messages = response.get("messages", [])
+        for message in messages:
+            message_id = message["id"]
+            full_message = get_user_email_details(message_id, service)
+            print("\nStart of email-------------------------------------")
+            sender = get_sender(full_message)
+            if sender:
+                print(f"From: {sender}")
+            print(f"Message ID: {message_id}")
+            print(f"{full_message['labelIds']}")
+            for part in full_message["payload"].get("parts", [full_message["payload"]]):
+                body = decode_message_part(part)
+                if body:
+                    print(f"Body:\n{body}")
+            print("\nEnd of email-------------------------------------\n")
+            print(f"---- 1) Trash message ---- 2) Add label(s) to message ---- 3) Remove label(s) ---- 4) Next message ---- 5) Exit Search ----\n")
+            menu_choice = input(f"Enter menu choice: ")
+            if menu_choice == "1":
+                trash_message(message_id, service)
+            elif menu_choice == "2":
+                add_labels_to_message(message_id, service)
+            elif menu_choice == "3":
+                remove_labels_from_message(message_id, service)
+            elif menu_choice == "4":
+                continue
+            else:
+                break
+            
+    except HttpError as error:
+        print(f"An error occurred while searching emails: {error}")
+# --------------------------------------------------------------------
+
+
+
+
+
 # Functions to get different parts of an email--------------------------------------------
 def get_user_email_details(message_id, service):
     message = service.users().messages().get(userId="me", id=message_id).execute()
@@ -152,9 +202,56 @@ def get_sender(message):
     headers = message["payload"]["headers"]
     for header in headers:
         if header["name"] == "From":
-            return header["value"]
+            from_value = header["value"]
+            # Use regex to extract email address
+            email_match = re.search(r'<(.+?)>', from_value)
+            if email_match :
+                # Extract and return the email address within angle brackets
+                return email_match.group(1)
+            else :
+                # If the email is not in angle brackets, return the full value
+                return from_value
     return None
 # ----------------------------------------------------------------------------------------
+
+
+
+
+
+# Label Functions----------------------------------------------------------
+def add_labels_to_message(message_id, service):
+    get_mailbox_labels(service)
+    labels = []
+    while True:
+        label = input(f"Enter label to add to message: ")
+        labels.append(label)
+        
+        choice = input(f"Add another label (Y/N)?: ")
+        if choice == "Y":
+            continue
+        elif choice == "N":
+            service.users().messages().modify(userId="me", id=message_id, body={'addLabelIds': labels}).execute()
+            break
+    print(f"Label(s) successfully added to message!\n")
+    time.sleep(3)
+    
+def remove_labels_from_message(message_id, service):
+    get_mailbox_labels(service)
+    labels = []
+    while True:
+        label = input(f"Enter label to remove from message: ")
+        labels.append(label)
+        
+        choice = input(f"Choose another label to remove (Y/N)?: ")
+        if choice == "Y":
+            continue
+        elif choice == "N":
+            service.users().messages().modify(userId="me", id=message_id, body={'removeLabelIds': labels}).execute()
+            break
+    print(f"Label(s) successfully removed from message!\n")
+    time.sleep(3)
+    
+# -------------------------------------------------------------------------
 
 
 
@@ -208,26 +305,47 @@ def get_number_of_emails(service):
     
     get_user_emails(service, num_emails)
     
-def delete_message(message_id, service):
+def trash_message(message_id, service):
     service.users().messages().trash(userId="me", id=message_id).execute()
-    print("Successfully deleted message")
+    print("Successfully trashed message")
+    
+def get_mailbox_labels(service):
+    response = service.users().labels().list(userId = "me").execute()
+    labels = response.get("labels", [])
+    print(f"---------- Labels ----------")
+    for label in labels:
+        print(label["name"])
+    print(f"----------------------------\n")
+    time.sleep(2)
     
 def show_menu(service):
     while True :
-        print(f"1) Show some emails \n")
-        print(f"2) Trash emails by sender \n")
-        print(f"3) Quit\n")
+        print(f"---------- Main Menu ----------")
+        print(f"| 1) Show some emails         |")
+        print(f"| 2) Trash emails by sender   |")
+        print(f"| 3) Search emails            |")
+        print(f"| 4) Get mailbox labels       |")
+        print(f"| 5) Quit                     |")
+        print(f"-------------------------------\n")
         menu_choice = input("Enter menu choice: ")
     
         if menu_choice == "1":
             get_number_of_emails(service)
         elif menu_choice == "2":
-            sender_email = input(f"\nEnter sender you'd like to delete emails from: ")
+            print(f'\nFor the sender value, input JUST the email address!\n')
+            sender_email = input(f"Enter sender you'd like to trash emails from: ")
             trash_messages_by_sender(service, sender_email)
             print(f"Done!")
-        else :
-            print(f"Thank you! Bye-bye!")
+        elif menu_choice == "3":
+            search_query = input(f"\nEnter search query: ")
+            search_emails(service, search_query)
+        elif menu_choice == "4":
+            get_mailbox_labels(service)
+        elif menu_choice == "5":
+            print(f"\nThank you! Bye-bye!")
             break
+        else:
+            print(f"Invalid menu choice. Try again.\n")
 # ------------------------------------------------------------
 
 
